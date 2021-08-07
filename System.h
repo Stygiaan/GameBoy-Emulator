@@ -66,7 +66,10 @@ public:
 	void FetchOpcode();
 	void ExecuteOpcode();
 
+	bool IsRunning();
+
 private:
+	bool running = false;
 	unsigned char opcode{};
 
 	// Memory
@@ -102,5 +105,14 @@ private:
 	void AsmCALLnn();
 	unsigned char AsmPOP();
 	void AsmRST(unsigned short address);
+	void AsmADD_A(unsigned char value);
+	void AsmADC_A(unsigned char value);
+	void AsmSUB_A(unsigned char value);
+	void AsmSBC_A(unsigned char value);
+	void AsmAND_A(unsigned char value);
+	void AsmOR_A(unsigned char value);
+	void AsmXOR_A(unsigned char value);
+	void AsmCP_A(unsigned char value);
+	void AsmRLC(unsigned char& value);
 };
 
