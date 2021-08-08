@@ -10,7 +10,6 @@ void System::Initialize()
 	opcode = 0;
 
 	std::memset(main_memory, 0, sizeof(main_memory));
-	// std::memset(video_memory, 0, sizeof(video_memory));
 	std::memset(stack, 0, sizeof(stack));
 
 	// registers = {};
@@ -34,6 +33,23 @@ void System::LoadRom(std::string path)
 	}
 
 	logger->Log("Loaded Rom of size: ", buffer.size());
+}
+
+bool System::IsRunning()
+{
+	return running;
+}
+unsigned char System::GetLastOpcode()
+{
+	return opcode;
+}
+unsigned char System::GetNextOpcode()
+{
+	return main_memory[pc];
+}
+Registers System::GetRegisters()
+{
+	return registers;
 }
 
 int System::EmulateCycle()
@@ -122,15 +138,13 @@ void System::ExecuteOpcode()
 	// RLC A
 	case 0x07:
 	{
-		unsigned char last_bit = (registers.a & (1 << 7)) == 0x80 ? 1 : 0;
+		unsigned char leftmost_bit = (registers.a & (1 << 7)) == 0x80 ? 1 : 0;
 
-		registers.a << 1;
+		registers.a <<= 1;
+		registers.a |= leftmost_bit << 7;
 
-		if (last_bit == 1)
-		{
-			registers.a |= 0b1;
+		if (leftmost_bit == 1)
 			SetBitflag(Carry);
-		}
 		else
 			ClearBitflag(Carry);
 
@@ -144,7 +158,8 @@ void System::ExecuteOpcode()
 	case 0x08:
 	{
 		unsigned short addr = (main_memory[++pc] << 8) | main_memory[++pc];
-		main_memory[addr] = sp;
+		main_memory[addr] = static_cast<unsigned char>(sp >> 8);
+		main_memory[addr + 1] = static_cast<unsigned char>(sp & 0xFF);
 
 		break;
 	}
@@ -223,13 +238,11 @@ void System::ExecuteOpcode()
 	{
 		unsigned char rightmost_bit = (registers.a & 0x1) == 0x1 ? 1 : 0;
 
-		registers.a >> 1;
+		registers.a >>= 1;
+		registers.a |= rightmost_bit << 7;
 
 		if (rightmost_bit == 1)
-		{
-			registers.a |= 1 << 7;
 			SetBitflag(Carry);
-		}
 		else
 			ClearBitflag(Carry);
 
@@ -309,7 +322,7 @@ void System::ExecuteOpcode()
 	{
 		unsigned char leftmost_bit = (registers.a & (0x1 << 7)) == 0x80 ? 1 : 0;
 
-		registers.a << 1;
+		registers.a <<= 1;
 
 		registers.a |= GetBitflag(Carry);
 
@@ -405,14 +418,13 @@ void System::ExecuteOpcode()
 	// RR A
 	case 0x1F:
 	{
-		unsigned char right_bit = (registers.a & 0x1) == 0x1 ? 1 : 0;
+		unsigned char rightmost_bit = (registers.a & 0x1) == 0x1 ? 1 : 0;
 
-		registers.a >> 1;
+		registers.a >>= 1;
 
-		// TODO: Set right bit to carry flag value
-		registers.a |= GetBitflag(Carry);
+		registers.a |= GetBitflag(Carry) << 7;
 
-		if (right_bit == 1)
+		if (rightmost_bit == 1)
 			SetBitflag(Carry);
 		else
 			ClearBitflag(Carry);
@@ -444,8 +456,8 @@ void System::ExecuteOpcode()
 	// LDI (HL),A
 	case 0x22:
 	{
-		unsigned short addr = (main_memory[++pc] << 8) | main_memory[++pc];
-		main_memory[addr] = registers.lh;
+		main_memory[registers.lh] = registers.a;
+		++registers.lh;
 
 		break;
 	}
@@ -1765,7 +1777,1794 @@ void System::ExecuteOpcode()
 			// RLC B
 		case 0x00:
 		{
+			AsmRLC(&registers.b);
 
+			break;
+		}
+		// RLC C
+		case 0x01:
+		{
+			AsmRLC(&registers.c);
+
+			break;
+		}
+		// RLC D
+		case 0x02:
+		{
+			AsmRLC(&registers.d);
+
+			break;
+		}
+		// RLC E
+		case 0x03:
+		{
+			AsmRLC(&registers.e);
+
+			break;
+		}
+		// RLC H
+		case 0x04:
+		{
+			AsmRLC(&registers.h);
+
+			break;
+		}
+		// RLC L
+		case 0x05:
+		{
+			AsmRLC(&registers.l);
+
+			break;
+		}
+		// RLC (HL)
+		case 0x06:
+		{
+			AsmRLC(&main_memory[registers.lh]);
+
+			break;
+		}
+		// RLC A
+		case 0x07:
+		{
+			AsmRLC(&registers.a);
+
+			break;
+		}
+		// RRC B
+		case 0x08:
+		{
+			AsmRRC(&registers.b);
+
+			break;
+		}
+		// RRC C
+		case 0x09:
+		{
+			AsmRRC(&registers.c);
+
+			break;
+		}
+		// RRC D
+		case 0x0A:
+		{
+			AsmRRC(&registers.d);
+
+			break;
+		}
+		// RRC E
+		case 0x0B:
+		{
+			AsmRRC(&registers.e);
+
+			break;
+		}
+		// RRC H
+		case 0x0C:
+		{
+			AsmRRC(&registers.h);
+
+			break;
+		}
+		// RRC L
+		case 0x0D:
+		{
+			AsmRRC(&registers.l);
+
+			break;
+		}
+		// RRC (HL)
+		case 0x0E:
+		{
+			AsmRRC(&main_memory[registers.lh]);
+
+			break;
+		}
+		// RRC A
+		case 0x0F:
+		{
+			AsmRRC(&registers.a);
+
+			break;
+		}
+		// RL B
+		case 0x10:
+		{
+			AsmRL(&registers.b);
+
+			break;
+		}
+		// RL C
+		case 0x11:
+		{
+			AsmRL(&registers.c);
+
+			break;
+		}
+		// RL D
+		case 0x12:
+		{
+			AsmRL(&registers.d);
+
+			break;
+		}
+		// RL E
+		case 0x13:
+		{
+			AsmRL(&registers.e);
+
+			break;
+		}
+		// RL H
+		case 0x14:
+		{
+			AsmRL(&registers.h);
+
+			break;
+		}
+		// RL L
+		case 0x15:
+		{
+			AsmRL(&registers.l);
+
+			break;
+		}
+		// RL (HL)
+		case 0x16:
+		{
+			AsmRL(&main_memory[registers.lh]);
+
+			break;
+		}
+		// RL A
+		case 0x17:
+		{
+			AsmRL(&registers.a);
+
+			break;
+		}
+		// RR B
+		case 0x18:
+		{
+			AsmRR(&registers.b);
+
+			break;
+		}
+		// RR C
+		case 0x19:
+		{
+			AsmRR(&registers.c);
+
+			break;
+		}
+		// RR D
+		case 0x1A:
+		{
+			AsmRR(&registers.d);
+
+			break;
+		}
+		// RR E
+		case 0x1B:
+		{
+			AsmRR(&registers.e);
+
+			break;
+		}
+		// RR H
+		case 0x1C:
+		{
+			AsmRR(&registers.h);
+
+			break;
+		}
+		// RR L
+		case 0x1D:
+		{
+			AsmRR(&registers.l);
+
+			break;
+		}
+		// RR (HL)
+		case 0x1E:
+		{
+			AsmRR(&main_memory[registers.lh]);
+
+			break;
+		}
+		// RR A
+		case 0x1F:
+		{
+			AsmRR(&registers.a);
+
+			break;
+		}
+		// SLA B
+		case 0x20:
+		{
+			AsmSLA(&registers.b);
+
+			break;
+		}
+		// SLA C
+		case 0x21:
+		{
+			AsmSLA(&registers.c);
+
+			break;
+		}
+		// SLA D
+		case 0x22:
+		{
+			AsmSLA(&registers.d);
+
+			break;
+		}
+		// SLA E
+		case 0x23:
+		{
+			AsmSLA(&registers.e);
+
+			break;
+		}
+		// SLA H
+		case 0x24:
+		{
+			AsmSLA(&registers.h);
+
+			break;
+		}
+		// SLA L
+		case 0x25:
+		{
+			AsmSLA(&registers.l);
+
+			break;
+		}
+		// SLA (HL)
+		case 0x26:
+		{
+			AsmSLA(&main_memory[registers.lh]);
+
+			break;
+		}
+		// SLA A
+		case 0x27:
+		{
+			AsmSLA(&registers.a);
+
+			break;
+		}
+		// SRA B
+		case 0x28:
+		{
+			AsmSRA(&registers.b);
+
+			break;
+		}
+		// SRA C
+		case 0x29:
+		{
+			AsmSRA(&registers.c);
+
+			break;
+		}
+		// SRA D
+		case 0x2A:
+		{
+			AsmSRA(&registers.d);
+
+			break;
+		}
+		// SRA E
+		case 0x2B:
+		{
+			AsmSRA(&registers.e);
+
+			break;
+		}
+		// SRA H
+		case 0x2C:
+		{
+			AsmSRA(&registers.h);
+
+			break;
+		}
+		// SRA L
+		case 0x2D:
+		{
+			AsmSRA(&registers.l);
+
+			break;
+		}
+		// SRA (HL)
+		case 0x2E:
+		{
+			AsmSRA(&main_memory[registers.lh]);
+
+			break;
+		}
+		// SRA A
+		case 0x2F:
+		{
+			AsmSRA(&registers.a);
+
+			break;
+		}
+		// SWAP B
+		case 0x30:
+		{
+			AsmSWAP(&registers.b);
+
+			break;
+		}
+		// SWAP C
+		case 0x31:
+		{
+			AsmSWAP(&registers.c);
+
+			break;
+		}
+		// SWAP D
+		case 0x32:
+		{
+			AsmSWAP(&registers.d);
+
+			break;
+		}
+		// SWAP E
+		case 0x33:
+		{
+			AsmSWAP(&registers.e);
+
+			break;
+		}
+		// SWAP H
+		case 0x34:
+		{
+			AsmSWAP(&registers.l);
+
+			break;
+		}
+		// SWAP L
+		case 0x35:
+		{
+			AsmSWAP(&registers.l);
+
+			break;
+		}
+		// SWAP (HL)
+		case 0x36:
+		{
+			AsmSWAP(&main_memory[registers.lh]);
+
+			break;
+		}
+		// SWAP A
+		case 0x37:
+		{
+			AsmSWAP(&registers.a);
+
+			break;
+		}
+		// SRL B
+		case 0x38:
+		{
+			AsmSRL(&registers.b);
+
+			break;
+		}
+		// SRL C
+		case 0x39:
+		{
+			AsmSRL(&registers.c);
+
+			break;
+		}
+		// SRL D
+		case 0x3A:
+		{
+			AsmSRL(&registers.d);
+
+			break;
+		}
+		// SRL E
+		case 0x3B:
+		{
+			AsmSRL(&registers.e);
+
+			break;
+		}
+		// SRL H
+		case 0x3C:
+		{
+			AsmSRL(&registers.h);
+
+			break;
+		}
+		// SRL L
+		case 0x3D:
+		{
+			AsmSRL(&registers.l);
+
+			break;
+		}
+		// SRL (HL)
+		case 0x3E:
+		{
+			AsmSRL(&main_memory[registers.b]);
+
+			break;
+		}
+		// SRL A
+		case 0x3F:
+		{
+			AsmSRL(&registers.a);
+
+			break;
+		}
+		// BIT 0, B
+		case 0x40:
+		{
+			AsmBIT(registers.b, 0);
+
+			break;
+		}
+		// BIT 0, C
+		case 0x41:
+		{
+			AsmBIT(registers.c, 0);
+
+			break;
+		}
+		// BIT 0, D
+		case 0x42:
+		{
+			AsmBIT(registers.d, 0);
+
+			break;
+		}
+		// BIT 0, E
+		case 0x43:
+		{
+			AsmBIT(registers.e, 0);
+
+			break;
+		}
+		// BIT 0, H
+		case 0x44:
+		{
+			AsmBIT(registers.h, 0);
+
+			break;
+		}
+		// BIT 0, L
+		case 0x45:
+		{
+			AsmBIT(registers.l, 0);
+
+			break;
+		}
+		// BIT 0, (HL)
+		case 0x46:
+		{
+			AsmBIT(main_memory[registers.lh], 0);
+
+			break;
+		}
+		// BIT 0, A
+		case 0x47:
+		{
+			AsmBIT(registers.a, 0);
+
+			break;
+		}
+		// BIT 1, B
+		case 0x48:
+		{
+			AsmBIT(registers.b, 1);
+
+			break;
+		}
+		// BIT 1, C
+		case 0x49:
+		{
+			AsmBIT(registers.c, 1);
+
+			break;
+		}
+		// BIT 1, D
+		case 0x4A:
+		{
+			AsmBIT(registers.d, 1);
+
+			break;
+		}
+		// BIT 1, E
+		case 0x4B:
+		{
+			AsmBIT(registers.e, 1);
+
+			break;
+		}
+		// BIT 1, H
+		case 0x4C:
+		{
+			AsmBIT(registers.h, 1);
+
+			break;
+		}
+		// BIT 1, L
+		case 0x4D:
+		{
+			AsmBIT(registers.l, 1);
+
+			break;
+		}
+		// BIT 1, (HL)
+		case 0x4E:
+		{
+			AsmBIT(main_memory[registers.lh], 1);
+
+			break;
+		}
+		// BIT 1, A
+		case 0x4F:
+		{
+			AsmBIT(registers.a, 1);
+
+			break;
+		}
+		// BIT 2, B
+		case 0x50:
+		{
+			AsmBIT(registers.b, 2);
+
+			break;
+		}
+		// BIT 2, C
+		case 0x51:
+		{
+			AsmBIT(registers.c, 2);
+
+			break;
+		}
+		// BIT 2, D
+		case 0x52:
+		{
+			AsmBIT(registers.d, 2);
+
+			break;
+		}
+		// BIT 2, E
+		case 0x53:
+		{
+			AsmBIT(registers.e, 2);
+
+			break;
+		}
+		// BIT 2, H
+		case 0x54:
+		{
+			AsmBIT(registers.h, 2);
+
+			break;
+		}
+		// BIT 2, L
+		case 0x55:
+		{
+			AsmBIT(registers.l, 2);
+
+			break;
+		}
+		// BIT 2, (HL)
+		case 0x56:
+		{
+			AsmBIT(main_memory[registers.lh], 2);
+
+			break;
+		}
+		// BIT 2, A
+		case 0x57:
+		{
+			AsmBIT(registers.a, 2);
+
+			break;
+		}
+		// BIT 3, B
+		case 0x58:
+		{
+			AsmBIT(registers.b, 3);
+
+			break;
+		}
+		// BIT 3, C
+		case 0x59:
+		{
+			AsmBIT(registers.c, 3);
+
+			break;
+		}
+		// BIT 3, D
+		case 0x5A:
+		{
+			AsmBIT(registers.d, 3);
+
+			break;
+		}
+		// BIT 3, E
+		case 0x5B:
+		{
+			AsmBIT(registers.e, 3);
+
+			break;
+		}
+		// BIT 3, H
+		case 0x5C:
+		{
+			AsmBIT(registers.h, 3);
+
+			break;
+		}
+		// BIT 3, L
+		case 0x5D:
+		{
+			AsmBIT(registers.l, 3);
+
+			break;
+		}
+		// BIT 3, (HL)
+		case 0x5E:
+		{
+			AsmBIT(main_memory[registers.lh], 3);
+
+			break;
+		}
+		// BIT 3, A
+		case 0x5F:
+		{
+			AsmBIT(registers.a, 3);
+
+			break;
+		}
+		// BIT 4, B
+		case 0x60:
+		{
+			AsmBIT(registers.b, 4);
+
+			break;
+		}
+		// BIT 4, C
+		case 0x61:
+		{
+			AsmBIT(registers.c, 4);
+
+			break;
+		}
+		// BIT 4, D
+		case 0x62:
+		{
+			AsmBIT(registers.d, 4);
+
+			break;
+		}
+		// BIT 4, E
+		case 0x63:
+		{
+			AsmBIT(registers.e, 4);
+
+			break;
+		}
+		// BIT 4, H
+		case 0x64:
+		{
+			AsmBIT(registers.h, 4);
+
+			break;
+		}
+		// BIT 4, L
+		case 0x65:
+		{
+			AsmBIT(registers.l, 4);
+
+			break;
+		}
+		// BIT 4, (HL)
+		case 0x66:
+		{
+			AsmBIT(main_memory[registers.lh], 4);
+
+			break;
+		}
+		// BIT 4, A
+		case 0x67:
+		{
+			AsmBIT(registers.a, 4);
+
+			break;
+		}
+		// BIT 5, B
+		case 0x68:
+		{
+			AsmBIT(registers.b, 5);
+
+			break;
+		}
+		// BIT 5, C
+		case 0x69:
+		{
+			AsmBIT(registers.c, 5);
+
+			break;
+		}
+		// BIT 5, D
+		case 0x6A:
+		{
+			AsmBIT(registers.d, 5);
+
+			break;
+		}
+		// BIT 5, E
+		case 0x6B:
+		{
+			AsmBIT(registers.e, 5);
+
+			break;
+		}
+		// BIT 5, H
+		case 0x6C:
+		{
+			AsmBIT(registers.h, 5);
+
+			break;
+		}
+		// BIT 5, L
+		case 0x6D:
+		{
+			AsmBIT(registers.l, 5);
+
+			break;
+		}
+		// BIT 5, (HL)
+		case 0x6E:
+		{
+			AsmBIT(main_memory[registers.lh], 5);
+
+			break;
+		}
+		// BIT 5, A
+		case 0x6F:
+		{
+			AsmBIT(registers.a, 5);
+
+			break;
+		}
+		// BIT 6, B
+		case 0x70:
+		{
+			AsmBIT(registers.b, 6);
+
+			break;
+		}
+		// BIT 6, C
+		case 0x71:
+		{
+			AsmBIT(registers.c, 6);
+
+			break;
+		}
+		// BIT 6, D
+		case 0x72:
+		{
+			AsmBIT(registers.d, 6);
+
+			break;
+		}
+		// BIT 6, E
+		case 0x73:
+		{
+			AsmBIT(registers.e, 6);
+
+			break;
+		}
+		// BIT 6, H
+		case 0x74:
+		{
+			AsmBIT(registers.h, 6);
+
+			break;
+		}
+		// BIT 6, L
+		case 0x75:
+		{
+			AsmBIT(registers.l, 6);
+
+			break;
+		}
+		// BIT 6, (HL)
+		case 0x76:
+		{
+			AsmBIT(main_memory[registers.lh], 6);
+
+			break;
+		}
+		// BIT 6, A
+		case 0x77:
+		{
+			AsmBIT(registers.a, 6);
+
+			break;
+		}
+		// BIT 7, B
+		case 0x78:
+		{
+			AsmBIT(registers.b, 7);
+
+			break;
+		}
+		// BIT 7, C
+		case 0x79:
+		{
+			AsmBIT(registers.c, 7);
+
+			break;
+		}
+		// BIT 7, D
+		case 0x7A:
+		{
+			AsmBIT(registers.d, 7);
+
+			break;
+		}
+		// BIT 7, E
+		case 0x7B:
+		{
+			AsmBIT(registers.e, 7);
+
+			break;
+		}
+		// BIT 7, H
+		case 0x7C:
+		{
+			AsmBIT(registers.h, 7);
+
+			break;
+		}
+		// BIT 7, L
+		case 0x7D:
+		{
+			AsmBIT(registers.l, 7);
+
+			break;
+		}
+		// BIT 7, (HL)
+		case 0x7E:
+		{
+			AsmBIT(main_memory[registers.lh], 7);
+
+			break;
+		}
+		// BIT 7, A
+		case 0x7F:
+		{
+			AsmBIT(registers.a, 7);
+
+			break;
+		}
+		// RES 0, B
+		case 0x80:
+		{
+			AsmRES(&registers.b, 0);
+
+			break;
+		}
+		// RES 0, C
+		case 0x81:
+		{
+			AsmRES(&registers.c, 0);
+
+			break;
+		}
+		// RES 0, D
+		case 0x82:
+		{
+			AsmRES(&registers.d, 0);
+
+			break;
+		}
+		// RES 0, E
+		case 0x83:
+		{
+			AsmRES(&registers.e, 0);
+
+			break;
+		}
+		// RES 0, H
+		case 0x84:
+		{
+			AsmRES(&registers.h, 0);
+
+			break;
+		}
+		// RES 0, L
+		case 0x85:
+		{
+			AsmRES(&registers.l, 0);
+
+			break;
+		}
+		// RES 0, (HL)
+		case 0x86:
+		{
+			AsmRES(&main_memory[registers.lh], 0);
+
+			break;
+		}
+		// RES 0, A
+		case 0x87:
+		{
+			AsmRES(&registers.a, 0);
+
+			break;
+		}
+		// RES 1, B
+		case 0x88:
+		{
+			AsmRES(&registers.b, 1);
+
+			break;
+		}
+		// RES 1, C
+		case 0x89:
+		{
+			AsmRES(&registers.c, 1);
+
+			break;
+		}
+		// RES 1, D
+		case 0x8A:
+		{
+			AsmRES(&registers.d, 1);
+
+			break;
+		}
+		// RES 1, E
+		case 0x8B:
+		{
+			AsmRES(&registers.e, 1);
+
+			break;
+		}
+		// RES 1, H
+		case 0x8C:
+		{
+			AsmRES(&registers.h, 1);
+
+			break;
+		}
+		// RES 1, L
+		case 0x8D:
+		{
+			AsmRES(&registers.l, 1);
+
+			break;
+		}
+		// RES 1, (HL)
+		case 0x8E:
+		{
+			AsmRES(&main_memory[registers.lh], 1);
+
+			break;
+		}
+		// RES 1, A
+		case 0x8F:
+		{
+			AsmRES(&registers.a, 1);
+
+			break;
+		}
+		// RES 2, B
+		case 0x90:
+		{
+			AsmRES(&registers.b, 2);
+
+			break;
+		}
+		// RES 2, C
+		case 0x91:
+		{
+			AsmRES(&registers.c, 2);
+
+			break;
+		}
+		// RES 2, D
+		case 0x92:
+		{
+			AsmRES(&registers.d, 2);
+
+			break;
+		}
+		// RES 2, E
+		case 0x93:
+		{
+			AsmRES(&registers.e, 2);
+
+			break;
+		}
+		// RES 2, H
+		case 0x94:
+		{
+			AsmRES(&registers.h, 2);
+
+			break;
+		}
+		// RES 2, L
+		case 0x95:
+		{
+			AsmRES(&registers.l, 2);
+
+			break;
+		}
+		// RES 2, (HL)
+		case 0x96:
+		{
+			AsmRES(&main_memory[registers.lh], 2);
+
+			break;
+		}
+		// RES 2, A
+		case 0x97:
+		{
+			AsmRES(&registers.a, 2);
+
+			break;
+		}
+		// RES 3, B
+		case 0x98:
+		{
+			AsmRES(&registers.b, 3);
+
+			break;
+		}
+		// RES 3, C
+		case 0x99:
+		{
+			AsmRES(&registers.c, 3);
+
+			break;
+		}
+		// RES 3, D
+		case 0x9A:
+		{
+			AsmRES(&registers.d, 3);
+
+			break;
+		}
+		// RES 3, E
+		case 0x9B:
+		{
+			AsmRES(&registers.e, 3);
+
+			break;
+		}
+		// RES 3, H
+		case 0x9C:
+		{
+			AsmRES(&registers.h, 3);
+
+			break;
+		}
+		// RES 3, L
+		case 0x9D:
+		{
+			AsmRES(&registers.l, 3);
+
+			break;
+		}
+		// RES 3, (HL)
+		case 0x9E:
+		{
+			AsmRES(&main_memory[registers.lh], 3);
+
+			break;
+		}
+		// RES 3, A
+		case 0x9F:
+		{
+			AsmRES(&registers.a, 3);
+
+			break;
+		}
+		// RES 4, B
+		case 0xA0:
+		{
+			AsmRES(&registers.b, 4);
+
+			break;
+		}
+		// RES 4, C
+		case 0xA1:
+		{
+			AsmRES(&registers.c, 4);
+
+			break;
+		}
+		// RES 4, D
+		case 0xA2:
+		{
+			AsmRES(&registers.d, 4);
+
+			break;
+		}
+		// RES 4, E
+		case 0xA3:
+		{
+			AsmRES(&registers.e, 4);
+
+			break;
+		}
+		// RES 4, H
+		case 0xA4:
+		{
+			AsmRES(&registers.h, 4);
+
+			break;
+		}
+		// RES 4, L
+		case 0xA5:
+		{
+			AsmRES(&registers.l, 4);
+
+			break;
+		}
+		// RES 4, (HL)
+		case 0xA6:
+		{
+			AsmRES(&main_memory[registers.lh], 4);
+
+			break;
+		}
+		// RES 4, A
+		case 0xA7:
+		{
+			AsmRES(&registers.a, 4);
+
+			break;
+		}
+		// RES 5, B
+		case 0xA8:
+		{
+			AsmRES(&registers.b, 5);
+
+			break;
+		}
+		// RES 5, C
+		case 0xA9:
+		{
+			AsmRES(&registers.c, 5);
+
+			break;
+		}
+		// RES 5, D
+		case 0xAA:
+		{
+			AsmRES(&registers.d, 5);
+
+			break;
+		}
+		// RES 5, E
+		case 0xAB:
+		{
+			AsmRES(&registers.e, 5);
+
+			break;
+		}
+		// RES 5, H
+		case 0xAC:
+		{
+			AsmRES(&registers.h, 5);
+
+			break;
+		}
+		// RES 5, L
+		case 0xAD:
+		{
+			AsmRES(&registers.l, 5);
+
+			break;
+		}
+		// RES 5, (HL)
+		case 0xAE:
+		{
+			AsmRES(&main_memory[registers.lh], 5);
+
+			break;
+		}
+		// RES 5, A
+		case 0xAF:
+		{
+			AsmRES(&registers.a, 5);
+
+			break;
+		}
+		// RES 6, B
+		case 0xB0:
+		{
+			AsmRES(&registers.b, 6);
+
+			break;
+		}
+		// RES 6, C
+		case 0xB1:
+		{
+			AsmRES(&registers.c, 6);
+
+			break;
+		}
+		// RES 6, D
+		case 0xB2:
+		{
+			AsmRES(&registers.d, 6);
+
+			break;
+		}
+		// RES 6, E
+		case 0xB3:
+		{
+			AsmRES(&registers.e, 6);
+
+			break;
+		}
+		// RES 6, H
+		case 0xB4:
+		{
+			AsmRES(&registers.h, 6);
+
+			break;
+		}
+		// RES 6, L
+		case 0xB5:
+		{
+			AsmRES(&registers.l, 6);
+
+			break;
+		}
+		// RES 6, (HL)
+		case 0xB6:
+		{
+			AsmRES(&main_memory[registers.lh], 6);
+
+			break;
+		}
+		// RES 6, A
+		case 0xB7:
+		{
+			AsmRES(&registers.a, 6);
+
+			break;
+		}
+		// RES 7, B
+		case 0xB8:
+		{
+			AsmRES(&registers.b, 7);
+
+			break;
+		}
+		// RES 7, C
+		case 0xB9:
+		{
+			AsmRES(&registers.c, 7);
+
+			break;
+		}
+		// RES 7, D
+		case 0xBA:
+		{
+			AsmRES(&registers.d, 7);
+
+			break;
+		}
+		// RES 7, E
+		case 0xBB:
+		{
+			AsmRES(&registers.e, 7);
+
+			break;
+		}
+		// RES 7, H
+		case 0xBC:
+		{
+			AsmRES(&registers.h, 7);
+
+			break;
+		}
+		// RES 7, L
+		case 0xBD:
+		{
+			AsmRES(&registers.l, 7);
+
+			break;
+		}
+		// RES 7, (HL)
+		case 0xBE:
+		{
+			AsmRES(&main_memory[registers.lh], 7);
+
+			break;
+		}
+		// RES 7, A
+		case 0xBF:
+		{
+			AsmRES(&registers.a, 7);
+
+			break;
+		}
+		// SET 0, B
+		case 0xC0:
+		{
+			AsmSET(&registers.b, 0);
+
+			break;
+		}
+		// SET 0, C
+		case 0xC1:
+		{
+			AsmSET(&registers.c, 0);
+
+			break;
+		}
+		// SET 0, D
+		case 0xC2:
+		{
+			AsmSET(&registers.d, 0);
+
+			break;
+		}
+		// SET 0, E
+		case 0xC3:
+		{
+			AsmSET(&registers.e, 0);
+
+			break;
+		}
+		// SET 0, H
+		case 0xC4:
+		{
+			AsmSET(&registers.h, 0);
+
+			break;
+		}
+		// SET 0, L
+		case 0xC5:
+		{
+			AsmSET(&registers.l, 0);
+
+			break;
+		}
+		// SET 0, (HL)
+		case 0xC6:
+		{
+			AsmSET(&main_memory[registers.lh], 0);
+
+			break;
+		}
+		// SET 0, A
+		case 0xC7:
+		{
+			AsmSET(&registers.a, 0);
+
+			break;
+		}
+		// SET 1, B
+		case 0xC8:
+		{
+			AsmSET(&registers.b, 1);
+
+			break;
+		}
+		// SET 1, C
+		case 0xC9:
+		{
+			AsmSET(&registers.c, 1);
+
+			break;
+		}
+		// SET 1, D
+		case 0xCA:
+		{
+			AsmSET(&registers.d, 1);
+
+			break;
+		}
+		// SET 1, E
+		case 0xCB:
+		{
+			AsmSET(&registers.e, 1);
+
+			break;
+		}
+		// SET 1, H
+		case 0xCC:
+		{
+			AsmSET(&registers.h, 1);
+
+			break;
+		}
+		// SET 1, L
+		case 0xCD:
+		{
+			AsmSET(&registers.l, 1);
+
+			break;
+		}
+		// SET 1, (HL)
+		case 0xCE:
+		{
+			AsmSET(&main_memory[registers.lh], 1);
+
+			break;
+		}
+		// SET 1, A
+		case 0xCF:
+		{
+			AsmSET(&registers.a, 1);
+
+			break;
+		}
+		// SET 2, B
+		case 0xD0:
+		{
+			AsmSET(&registers.b, 2);
+
+			break;
+		}
+		// SET 2, C
+		case 0xD1:
+		{
+			AsmSET(&registers.c, 2);
+
+			break;
+		}
+		// SET 2, D
+		case 0xD2:
+		{
+			AsmSET(&registers.d, 2);
+
+			break;
+		}
+		// SET 2, E
+		case 0xD3:
+		{
+			AsmSET(&registers.e, 2);
+
+			break;
+		}
+		// SET 2, H
+		case 0xD4:
+		{
+			AsmSET(&registers.h, 2);
+
+			break;
+		}
+		// SET 2, L
+		case 0xD5:
+		{
+			AsmSET(&registers.l, 2);
+
+			break;
+		}
+		// SET 2, (HL)
+		case 0xD6:
+		{
+			AsmSET(&main_memory[registers.lh], 2);
+
+			break;
+		}
+		// SET 2, A
+		case 0xD7:
+		{
+			AsmSET(&registers.a, 2);
+
+			break;
+		}
+		// SET 3, B
+		case 0xD8:
+		{
+			AsmSET(&registers.b, 3);
+
+			break;
+		}
+		// SET 3, C
+		case 0xD9:
+		{
+			AsmSET(&registers.c, 3);
+
+			break;
+		}
+		// SET 3, D
+		case 0xDA:
+		{
+			AsmSET(&registers.d, 3);
+
+			break;
+		}
+		// SET 3, E
+		case 0xDB:
+		{
+			AsmSET(&registers.e, 3);
+
+			break;
+		}
+		// SET 3, H
+		case 0xDC:
+		{
+			AsmSET(&registers.h, 3);
+
+			break;
+		}
+		// SET 3, L
+		case 0xDD:
+		{
+			AsmSET(&registers.l, 3);
+
+			break;
+		}
+		// SET 3, (HL)
+		case 0xDE:
+		{
+			AsmSET(&main_memory[registers.lh], 3);
+
+			break;
+		}
+		// SET 3, A
+		case 0xDF:
+		{
+			AsmSET(&registers.a, 3);
+
+			break;
+		}
+		// SET 4, B
+		case 0xE0:
+		{
+			AsmSET(&registers.b, 4);
+
+			break;
+		}
+		// SET 4, C
+		case 0xE1:
+		{
+			AsmSET(&registers.c, 4);
+
+			break;
+		}
+		// SET 4, D
+		case 0xE2:
+		{
+			AsmSET(&registers.d, 4);
+
+			break;
+		}
+		// SET 4, E
+		case 0xE3:
+		{
+			AsmSET(&registers.e, 4);
+
+			break;
+		}
+		// SET 4, H
+		case 0xE4:
+		{
+			AsmSET(&registers.h, 4);
+
+			break;
+		}
+		// SET 4, L
+		case 0xE5:
+		{
+			AsmSET(&registers.l, 4);
+
+			break;
+		}
+		// SET 4, (HL)
+		case 0xE6:
+		{
+			AsmSET(&main_memory[registers.lh], 4);
+
+			break;
+		}
+		// SET 4, A
+		case 0xE7:
+		{
+			AsmSET(&registers.a, 4);
+
+			break;
+		}
+		// SET 5, B
+		case 0xE8:
+		{
+			AsmSET(&registers.b, 5);
+
+			break;
+		}
+		// SET 5, C
+		case 0xE9:
+		{
+			AsmSET(&registers.c, 5);
+
+			break;
+		}
+		// SET 5, D
+		case 0xEA:
+		{
+			AsmSET(&registers.d, 5);
+
+			break;
+		}
+		// SET 5, E
+		case 0xEB:
+		{
+			AsmSET(&registers.e, 5);
+
+			break;
+		}
+		// SET 5, H
+		case 0xEC:
+		{
+			AsmSET(&registers.h, 5);
+
+			break;
+		}
+		// SET 5, L
+		case 0xED:
+		{
+			AsmSET(&registers.l, 5);
+
+			break;
+		}
+		// SET 5, (HL)
+		case 0xEE:
+		{
+			AsmSET(&main_memory[registers.lh], 5);
+
+			break;
+		}
+		// SET 5, A
+		case 0xEF:
+		{
+			AsmSET(&registers.a, 5);
+
+			break;
+		}
+		// SET 6, B
+		case 0xF0:
+		{
+			AsmSET(&registers.b, 6);
+
+			break;
+		}
+		// SET 6, C
+		case 0xF1:
+		{
+			AsmSET(&registers.c, 6);
+
+			break;
+		}
+		// SET 6, D
+		case 0xF2:
+		{
+			AsmSET(&registers.d, 6);
+
+			break;
+		}
+		// SET 6, E
+		case 0xF3:
+		{
+			AsmSET(&registers.e, 6);
+
+			break;
+		}
+		// SET 6, H
+		case 0xF4:
+		{
+			AsmSET(&registers.h, 6);
+
+			break;
+		}
+		// SET 6, L
+		case 0xF5:
+		{
+			AsmSET(&registers.l, 6);
+
+			break;
+		}
+		// SET 6, (HL)
+		case 0xF6:
+		{
+			AsmSET(&main_memory[registers.lh], 6);
+
+			break;
+		}
+		// SET 6, A
+		case 0xF7:
+		{
+			AsmSET(&registers.a, 6);
+
+			break;
+		}
+		// SET 7, B
+		case 0xF8:
+		{
+			AsmSET(&registers.b, 7);
+
+			break;
+		}
+		// SET 7, C
+		case 0xF9:
+		{
+			AsmSET(&registers.c, 7);
+
+			break;
+		}
+		// SET 7, D
+		case 0xFA:
+		{
+			AsmSET(&registers.d, 7);
+
+			break;
+		}
+		// SET 7, E
+		case 0xFB:
+		{
+			AsmSET(&registers.e, 7);
+
+			break;
+		}
+		// SET 7, H
+		case 0xFC:
+		{
+			AsmSET(&registers.h, 7);
+
+			break;
+		}
+		// SET 7, L
+		case 0xFD:
+		{
+			AsmSET(&registers.l, 7);
+
+			break;
+		}
+		// SET 7, (HL)
+		case 0xFE:
+		{
+			AsmSET(&main_memory[registers.lh], 7);
+
+			break;
+		}
+		// SET 7, A
+		case 0xFF:
+		{
+			AsmSET(&registers.a, 7);
+
+			break;
 		}
 
 		default:
@@ -2199,11 +3998,6 @@ void System::ExecuteOpcode()
 	++pc;
 }
 
-bool System::IsRunning()
-{
-	return running;
-}
-
 void System::SetBitflag(BitFlags flag)
 {
 	registers.f |= 1 << flag;
@@ -2369,7 +4163,121 @@ void System::AsmCP_A(unsigned char val)
 	else
 		ClearBitflag(Half_Carry);
 }
-void System::AsmRLC(unsigned char& val)
+void System::AsmRLC(unsigned char* val)
 {
+	unsigned char leftmost_bit = (*val & (0x1 << 7)) == 0x80 ? 1 : 0;
 
+	*val <<= 1;
+	*val |= leftmost_bit;
+
+	if (leftmost_bit == 1)
+		SetBitflag(Carry);
+	else
+		ClearBitflag(Carry);
+
+	*val == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+	ClearBitflag(Subtract);
+	ClearBitflag(Half_Carry);
+}
+void System::AsmRRC(unsigned char* val)
+{
+	unsigned char rightmost_bit = (*val & 0x1) == 0x1 ? 1 : 0;
+
+	*val >>= 1;
+	*val |= rightmost_bit << 7;
+
+	if (rightmost_bit == 1)
+		SetBitflag(Carry);
+	else
+		ClearBitflag(Carry);
+
+	*val == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+	ClearBitflag(Subtract);
+	ClearBitflag(Half_Carry);
+}
+void System::AsmRL(unsigned char* val)
+{
+	unsigned char leftmost_bit = (*val & (0x1 << 7)) == 0x80 ? 1 : 0;
+
+	*val <<= 1;
+	*val |= GetBitflag(Carry);
+
+	leftmost_bit == 1 ? SetBitflag(Carry) : ClearBitflag(Carry);
+
+	*val == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+	ClearBitflag(Subtract);
+	ClearBitflag(Half_Carry);
+}
+void System::AsmRR(unsigned char* val)
+{
+	unsigned char rightmost_bit = (*val & 0x1) == 0x1 ? 1 : 0;
+
+	*val >>= 1;
+	*val |= GetBitflag(Carry) << 7;
+
+	rightmost_bit == 1 ? SetBitflag(Carry) : ClearBitflag(Carry);
+
+	*val == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+	ClearBitflag(Subtract);
+	ClearBitflag(Half_Carry);
+}
+void System::AsmSLA(unsigned char* val)
+{
+	unsigned char leftmost_bit = (*val & (0x1 << 7)) == 0x80 ? 1 : 0;
+
+	*val <<= 1;
+
+	leftmost_bit == 1 ? SetBitflag(Carry) : ClearBitflag(Carry);
+	*val == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+	ClearBitflag(Subtract);
+	ClearBitflag(Half_Carry);
+}
+void System::AsmSRA(unsigned char* val)
+{
+	unsigned char rightmost_bit = (*val & 0x1) == 0x1 ? 1 : 0;
+
+	*val <<= 1;
+	*val |= rightmost_bit << 7;
+
+	rightmost_bit == 1 ? SetBitflag(Carry) : ClearBitflag(Carry);
+	*val == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+	ClearBitflag(Subtract);
+	ClearBitflag(Half_Carry);
+}
+void System::AsmSWAP(unsigned char* val)
+{
+	unsigned char low_nibble = *val & 0x0F;
+
+	*val >>= 4;
+	*val &= low_nibble << 4;
+
+	*val == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+	ClearBitflag(Subtract);
+	ClearBitflag(Half_Carry);
+	ClearBitflag(Carry);
+}
+void System::AsmSRL(unsigned char* val)
+{
+	unsigned char rightmost_bit = (*val & 0x1) == 0x1 ? 1 : 0;
+
+	*val >>= 1;
+
+	rightmost_bit == 1 ? SetBitflag(Carry) : ClearBitflag(Carry);
+	*val == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+	ClearBitflag(Subtract);
+	ClearBitflag(Half_Carry);
+}
+void System::AsmBIT(unsigned char val, short bit)
+{
+	(val & (1 << bit)) == (1 << bit) ? ClearBitflag(Zero) : SetBitflag(Zero);
+	ClearBitflag(Subtract);
+	ClearBitflag(Half_Carry);
+}
+void System::AsmRES(unsigned char* val, short bit)
+{
+	*val &= 0xFF ^ (1 << bit);
+}
+void System::AsmSET(unsigned char* val, short bit)
+{
+	*val |= 1 << bit;
 }

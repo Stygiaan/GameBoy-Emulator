@@ -67,6 +67,9 @@ public:
 	void ExecuteOpcode();
 
 	bool IsRunning();
+	unsigned char GetLastOpcode();
+	unsigned char GetNextOpcode();
+	Registers GetRegisters();
 
 private:
 	bool running = false;
@@ -113,6 +116,16 @@ private:
 	void AsmOR_A(unsigned char value);
 	void AsmXOR_A(unsigned char value);
 	void AsmCP_A(unsigned char value);
-	void AsmRLC(unsigned char& value);
+	void AsmRLC(unsigned char* value);
+	void AsmRRC(unsigned char* value);
+	void AsmRL(unsigned char* value);
+	void AsmRR(unsigned char* value);
+	void AsmSLA(unsigned char* value);
+	void AsmSRA(unsigned char* value);
+	void AsmSWAP(unsigned char* value);
+	void AsmSRL(unsigned char* value);
+	void AsmBIT(unsigned char value, short bit);
+	void AsmRES(unsigned char* value, short bit);
+	void AsmSET(unsigned char* value, short bit);
 };
 
