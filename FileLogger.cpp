@@ -3,8 +3,7 @@
 FileLogger::FileLogger()
 {
 	logfile_stream = new std::ofstream("./debug.log", std::ios::app);
-	*logfile_stream << "\n==========================\n " << GetTimestamp() << "\n==========================\n\n";
-	logfile_stream->flush();
+	*logfile_stream << "\n==========================\n " << GetTimestamp() << "\n==========================\n" << std::endl;
 }
 
 FileLogger::~FileLogger()

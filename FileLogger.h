@@ -6,6 +6,11 @@
 #include <string>
 #include <memory>
 #include <cstdarg>
+#include <map>
+
+#define LOG_INFO 0
+#define LOG_WARNING 1
+#define LOG_ERROR 2
 
 class FileLogger
 {
@@ -13,35 +18,28 @@ public:
 	FileLogger();
 	~FileLogger();
 
+	std::string GetTimestamp();
+
 	template<typename T>
-	void Log(T&& msg)
+	void Log(int type, T&& msg)
 	{
-		*logfile_stream << msg << "\n";
-		logfile_stream->flush();
+		*logfile_stream << logtype[type] << msg << std::endl;
 	}
 	template<typename Head, typename... Tail>
-	void Log(Head&& head, Tail&&... tail) {
-		*logfile_stream << head;
-		logfile_stream->flush();
+	void Log(int type, Head&& head, Tail&&... tail) {
+		*logfile_stream << logtype[type] << head;
 
 		Log(std::forward<Tail>(tail)...);
 	}
-	//template <typename... Args>
-	//void Log(Args... args)
-	//{
-	//	std::va_list args;
-
-	//	*logfile_stream << "[" << GetTimestamp() << "]: " << "\n";
-
-	//	/*for (msg : args)
-	//	{
-
-	//	}*/
-	//}
-	//void Log(std::string&& message);
-	std::string GetTimestamp();  
 
 private:
+	template<typename T>
+	void Log(T&& msg)
+	{
+		*logfile_stream << msg << std::endl;
+	}
+
 	std::ofstream* logfile_stream{};
+	std::map<int, std::string> logtype = { {0, "[Info]    "}, {1, "[Warning] "}, {2, "[Error]   "} };
 };
 
