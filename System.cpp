@@ -7,13 +7,10 @@ System::System(FileLogger* logger)
 
 void System::Initialize()
 {
-	opcode = 0;
-
 	std::memset(main_memory, 0, sizeof(main_memory));
-	std::memset(stack, 0, sizeof(stack));
 
-	// registers = {};
-	pc = 0x0100;
+	// registers = {0};
+	pc = 0x0000;
 	sp = 0xFFFE;
 
 	running = true;
@@ -32,12 +29,25 @@ void System::LoadRom(std::string path)
 		main_memory[i] = buffer[i];
 	}
 
-	logger->Log("Loaded Rom of size: ", buffer.size());
+	logger->Log(LOG_INFO, "Loaded Rom of size: ", buffer.size());
+}
+
+unsigned char System::GetInputRegister()
+{
+	return main_memory[0xFF00];
+}
+void System::SetInputRegister(unsigned char keypad)
+{
+	main_memory[0xFF00] = keypad;
 }
 
 bool System::IsRunning()
 {
 	return running;
+}
+void System::SetRunning(bool running)
+{
+	this->running = running;
 }
 unsigned char System::GetLastOpcode()
 {
@@ -51,16 +61,64 @@ Registers System::GetRegisters()
 {
 	return registers;
 }
-
-int System::EmulateCycle()
+unsigned short System::GetPC()
 {
-	if (pc > sizeof(main_memory))
-		return 1;
+	return pc;
+}
+unsigned short System::GetSP()
+{
+	return sp;
+}
 
-	FetchOpcode();
-	ExecuteOpcode();
+void System::EmulateCycle()
+{
+	if (!halted)
+	{
+		if (pc > sizeof(main_memory))
+		{
+			logger->Log(LOG_ERROR, "PC points out of memory.");
+			return;
+		}
 
-	return 0;
+		FetchOpcode();
+		ExecuteOpcode();
+	}
+
+	if (IME)
+		ProcessInterrupts();
+}
+
+void System::ProcessInterrupts()
+{
+	unsigned char IF = main_memory[0xFF0F];
+	unsigned char IE = main_memory[0xFFFF];
+	unsigned char mask = 1;
+
+	for (int i = 0; i <= 4; ++i)
+	{
+		if ((IF & mask) == mask)
+		{
+			if ((IE & mask) == mask)
+			{
+				// main_memory[0xFF0F] = 0;
+				main_memory[0xFF0F] ^= mask;
+
+				if (halted)
+				{
+					++pc;
+					halted = false;
+				}
+
+				IME = false;
+
+				AsmCALLInterrupt(interrupt_addresses[1]);
+
+				break;
+			}
+		}
+
+		mask <<= 1;
+	}
 }
 
 void System::FetchOpcode()
@@ -101,30 +159,14 @@ void System::ExecuteOpcode()
 	// INC B
 	case 0x04:
 	{
-		if ((((registers.b & 0xF) + (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		++registers.b;
-
-		ClearBitflag(Subtract);
-		registers.b == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmINC_s(&registers.b);
 
 		break;
 	}
 	// DEC B
 	case 0x05:
 	{
-		if ((((registers.b & 0xF) - (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		--registers.b;
-
-		SetBitflag(Subtract);
-		registers.b == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmDEC_s(&registers.b);
 
 		break;
 	}
@@ -199,30 +241,14 @@ void System::ExecuteOpcode()
 	// INC C
 	case 0x0C:
 	{
-		if ((((registers.c & 0xF) + (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		++registers.c;
-
-		ClearBitflag(Subtract);
-		registers.c == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmINC_s(&registers.c);
 
 		break;
 	}
 	// DEC C
 	case 0x0D:
 	{
-		if ((((registers.c & 0xF) - (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		--registers.c;
-
-		SetBitflag(Subtract);
-		registers.c == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmDEC_s(&registers.c);
 
 		break;
 	}
@@ -283,30 +309,14 @@ void System::ExecuteOpcode()
 	// INC D
 	case 0x14:
 	{
-		if ((((registers.d & 0xF) + (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		++registers.d;
-
-		ClearBitflag(Subtract);
-		registers.d == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmINC_s(&registers.d);
 
 		break;
 	}
 	// DEC D
 	case 0x15:
 	{
-		if ((((registers.d & 0xF) - (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		--registers.d;
-
-		SetBitflag(Subtract);
-		registers.d == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmDEC_s(&registers.d);
 
 		break;
 	}
@@ -381,30 +391,14 @@ void System::ExecuteOpcode()
 	// INC E
 	case 0x1C:
 	{
-		if ((((registers.e & 0xF) + (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		++registers.e;
-
-		ClearBitflag(Subtract);
-		registers.e == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmINC_s(&registers.e);
 
 		break;
 	}
 	// DEC E
 	case 0x1D:
 	{
-		if ((((registers.e & 0xF) - (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		--registers.e;
-
-		SetBitflag(Subtract);
-		registers.e == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmDEC_s(&registers.e);
 
 		break;
 	}
@@ -471,30 +465,14 @@ void System::ExecuteOpcode()
 	// INC H
 	case 0x24:
 	{
-		if ((((registers.h & 0xF) + (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		++registers.h;
-
-		ClearBitflag(Subtract);
-		registers.h == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmINC_s(&registers.h);
 
 		break;
 	}
 	// DEC H
 	case 0x25:
 	{
-		if ((((registers.h & 0xF) - (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		--registers.h;
-
-		SetBitflag(Subtract);
-		registers.h == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmDEC_s(&registers.h);
 
 		break;
 	}
@@ -568,30 +546,14 @@ void System::ExecuteOpcode()
 	// INC L
 	case 0x2C:
 	{
-		if ((((registers.l & 0xF) + (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		++registers.l;
-
-		ClearBitflag(Subtract);
-		registers.l == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmINC_s(&registers.l);
 
 		break;
 	}
 	// DEC L
 	case 0x2D:
 	{
-		if ((((registers.l & 0xF) - (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		--registers.l;
-
-		SetBitflag(Subtract);
-		registers.l == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmDEC_s(&registers.l);
 
 		break;
 	}
@@ -648,30 +610,14 @@ void System::ExecuteOpcode()
 	// INC (HL)
 	case 0x34:
 	{
-		if ((((main_memory[registers.lh] & 0xF) + (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		++main_memory[registers.lh];
-
-		ClearBitflag(Subtract);
-		main_memory[registers.lh] == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmINC_s(&main_memory[registers.lh]);
 
 		break;
 	}
 	// DEC (HL)
 	case 0x35:
 	{
-		if ((((main_memory[registers.lh] & 0xF) - (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		--main_memory[registers.lh];
-
-		SetBitflag(Subtract);
-		main_memory[registers.lh] == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmDEC_s(&main_memory[registers.lh]);
 
 		break;
 	}
@@ -737,30 +683,14 @@ void System::ExecuteOpcode()
 	// INC A
 	case 0x3C:
 	{
-		if ((((registers.a & 0xF) + (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		++registers.a;
-
-		ClearBitflag(Subtract);
-		registers.a == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmINC_s(&registers.a);
 
 		break;
 	}
 	// DEC A
 	case 0x3D:
 	{
-		if ((((registers.a & 0xF) - (1 & 0xF)) & 0x10) == 0x10)
-			SetBitflag(Half_Carry);
-		else
-			ClearBitflag(Half_Carry);
-
-		--registers.a;
-
-		SetBitflag(Subtract);
-		registers.a == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+		AsmDEC_s(&registers.a);
 
 		break;
 	}
@@ -1159,7 +1089,7 @@ void System::ExecuteOpcode()
 	// HALT
 	case 0x76:
 	{
-		// TODO
+		halted = true;
 
 		break;
 	}
@@ -1706,7 +1636,7 @@ void System::ExecuteOpcode()
 	// JP nn
 	case 0xC3:
 	{
-		pc = (main_memory[++pc] << 8) | main_memory[++pc];
+		pc = (main_memory[pc + 1] << 8) | main_memory[pc + 2];
 		--pc;
 
 		break;
@@ -3572,7 +3502,7 @@ void System::ExecuteOpcode()
 			std::stringstream ss;
 			ss << "Unknown Extended(BC) Opcode: " << std::hex << static_cast<int>(opcode);
 
-			logger->Log(ss.str());
+			logger->Log(LOG_WARNING, ss.str());
 		}
 		}
 
@@ -3682,7 +3612,7 @@ void System::ExecuteOpcode()
 	{
 		AsmReturn();
 
-		// TODO: Enable Interrupts
+		IME = true;
 
 		break;
 	}
@@ -3885,7 +3815,9 @@ void System::ExecuteOpcode()
 	// DI (Disable Interrupts)
 	case 0xF3:
 	{
-		// TODO: Disable interrupts
+		main_memory[0xFF0F] = 0;
+		main_memory[0xFFFF] = 0;
+		IME = false;
 
 		break;
 	}
@@ -3955,7 +3887,7 @@ void System::ExecuteOpcode()
 	// EI (Enable Interrupts)
 	case 0xFB:
 	{
-		// TODO: Enable Interrupts
+		IME = true;
 
 		break;
 	}
@@ -3989,7 +3921,7 @@ void System::ExecuteOpcode()
 		std::stringstream ss;
 		ss << "Unknown Opcode: " << std::hex << static_cast<int>(opcode);
 
-		logger->Log(ss.str());
+		logger->Log(LOG_WARNING, ss.str());
 
 		break;
 	}
@@ -4018,6 +3950,30 @@ unsigned char System::GetBitflag(BitFlags flag)
 	return 0;
 }
 
+void System::AsmINC_s(unsigned char* val)
+{
+	if ((((*val & 0xF) + (1 & 0xF)) & 0x10) == 0x10)
+		SetBitflag(Half_Carry);
+	else
+		ClearBitflag(Half_Carry);
+
+	++*val;
+
+	ClearBitflag(Subtract);
+	*val == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+}
+void System::AsmDEC_s(unsigned char* val)
+{
+	if ((((*val & 0xF) - (1 & 0xF)) & 0x10) == 0x10)
+		SetBitflag(Half_Carry);
+	else
+		ClearBitflag(Half_Carry);
+
+	--*val;
+
+	SetBitflag(Subtract);
+	*val == 0 ? SetBitflag(Zero) : ClearBitflag(Zero);
+}
 void System::AsmReturn()
 {
 	unsigned short addr = main_memory[sp] << 8;
@@ -4028,6 +3984,13 @@ void System::AsmReturn()
 
 	pc = addr;
 	--pc;
+}
+void System::AsmCALLInterrupt(short addr)
+{
+	main_memory[--sp] = static_cast<unsigned char>((pc) & 0x00FF);
+	main_memory[--sp] = static_cast<unsigned char>(((pc) & 0xFF00) >> 8);
+
+	pc = addr;
 }
 void System::AsmCALLnn()
 {
